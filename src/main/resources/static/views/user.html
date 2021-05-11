@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Safe Mode</title>
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <script src="../js/vue.js"></script>
+  <script src="../js/jquery.min.js"></script>
+  <link rel="stylesheet" href="../css/index.css">
+  <script src="../js/index.js"></script>
+  <script src="../js/request.js"></script>
+</head>
+<body> 
+<el-form :model="userVo" status-icon :rules="rules" ref="user" label-width="100px" class="user" id="app" style="width:400px;margin: 0 auto;margin-top:100px">
+    <el-form-item label="用户名" prop="username">
+        <el-input v-model="userVo.username"></el-input>
+    </el-form-item>
+    <el-form-item label="旧密码" prop="oldPassword">
+        <el-input type="password" v-model="userVo.oldPassword" autocomplete="off"></el-input>
+    </el-form-item>
+    <el-form-item label="密码" prop="password">
+        <el-input type="password" v-model="userVo.password" autocomplete="off"></el-input>
+    </el-form-item>
+    <el-form-item label="确认密码" prop="checkPassword">
+        <el-input type="password" v-model="userVo.checkPassword" autocomplete="off"></el-input>
+    </el-form-item>
+    <el-form-item>
+        <el-button type="primary" @click="saveUser('user')">提交</el-button>
+        <el-button @click="reset()">重置</el-button>
+    </el-form-item>
+</el-form>
+<script>
+var that = this
+var vm = new Vue({
+    el: '#app',
+    data() {
+        var validatePass = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('请输入密码'))
+            }  else if (value.length < 5 || value.length > 15){
+                callback(new Error('密码长度在5-15之间!'))
+            }else {
+            if (this.userVo.checkPassword !== '') {
+                this.$refs.user.validateField('checkPassword')
+            }
+                callback()
+            }
+        }
+        var validatePass2 = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('请再次输入密码'))
+            } else if (value !== this.userVo.password) {
+                callback(new Error('两次输入密码不一致!'))
+            } else {
+                callback()
+            }
+        }
+        var checkUserName = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('用户名字不能为空!'))
+            } else if (value.length < 5 || value.length > 10) {
+                callback(new Error('用户名长度在5-10之间!'))
+            } else {
+                callback()
+            }
+        }
+        var checkPass = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('密码不能为空!'))
+            } else {
+                callback()
+            }
+        }
+        return {
+            userVo: {
+                username: '',
+                oldPassword: '',
+                password: '',
+                checkPassword: '',
+                id: ''
+            },
+            rules: {
+                oldPassword: [
+                    { validator: checkPass, trigger: 'blur' }
+                ],
+                username: [
+                    { validator: checkUserName, trigger: 'blur' }
+                ],
+                password: [
+                    { validator: validatePass, trigger: 'blur' }
+                ],
+                checkPassword: [
+                    { validator: validatePass2, trigger: 'blur' }
+                ],
+            }
+        }
+    },
+    mounted() {
+        this.init()
+    },
+    methods: {
+        saveUser(formName) {
+            this.$refs[formName].validate((valid) => {
+                if (!valid) {
+                    return
+                }
+                that.post('/user/updateUser', this.userVo)
+                .then(res => {
+                    if (res.code === 200) {
+                        this.$message({
+                            message: '修改成功',
+                            type: 'success'
+                        })
+                    } else {
+                        this.$message.error(res.message)
+                    }
+                })
+            })
+        },
+        reset() {
+            this.userVo = {}
+        },
+        init() {
+            that.get("/user/getUserName")
+            .then(res => {
+                console.log("res", res)
+                if (res.code === 200) {
+                    this.userVo.username = res.data.user.username
+                    this.userVo.id = res.data.user.id
+                } else {
+                    this.$message.error(res.message)
+                }
+                
+            })
+        }
+    }
+})
+</script>
+
+</body>
+</html>

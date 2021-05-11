@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Safe Mode</title>
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <script src="../js/vue.js"></script>
+  <link rel="stylesheet" href="../css/index.css">
+  <script src="../js/index.js"></script>
+  <script src="../js/jquery.min.js"></script>
+  <script src="../js/request.js"></script>
+</head>
+<body>
+  <div id="app" style="text-align:center">
+    <el-form :inline="true" class="demo-form-inline" style="margin-bottom:20px;margin-top:20px;margin-left:32%">     
+      <el-input placeholder="关键字搜索" v-model="key" class="input-with-select" style="width:500px;margin-right:30px">
+        <el-select v-model="searchType" slot="prepend" placeholder="请选择" style="width:120px">
+          <el-option label="MAC" value="mac"></el-option>
+          <el-option label="Model" value="model"></el-option>
+          <el-option label="SN" value="sn"></el-option>
+          <el-option label="Device ID" value="deviceId"></el-option>
+        </el-select>
+        <el-button slot="append" icon="el-icon-search" @click="search()"></el-button>
+      </el-input>
+      <el-button @click="handleClickAdd()">添加</el-button>
+      <el-button @click="handleClickDelete()" type="danger">删除</el-button>
+      <el-button type="primary" @click="uploadDialogVisible = true">上传<i class="el-icon-upload el-icon--right"></i></el-button>
+    </el-form>
+    <el-table
+    ref="multipleTable"
+    :data="stolenTvInfoVo.records"
+    border
+    tooltip-effect="dark"
+    style="width: 74%;margin:auto"
+    @selection-change="handleSelectionChange">
+    <el-table-column type="selection" width="55"></el-table-column>
+    <el-table-column fixed prop="id" label="ID" width="180"></el-table-column>
+    <el-table-column prop="model" label="Model" width="200"></el-table-column>
+    <el-table-column prop="mac" label="MAC" width="200"></el-table-column>
+    <el-table-column prop="sn" label="SN" width="200"></el-table-column>
+    <el-table-column prop="deviceId" label="Device ID" width="200"></el-table-column>
+    <el-table-column prop="editTime" label="更新时间" width="180"></el-table-column>
+    <el-table-column fixed="right" label="操作" width="100">
+      <template slot-scope="scope">
+        <el-button @click="edit(scope.row)" type="text" size="small">编辑</el-button>
+        <el-button @click="remove(scope.row)" type="text" size="small">删除</el-button>
+      </template>
+    </el-table-column>
+  </el-table>
+  <div style="margin-left:45% auto;margin-top: 20px">
+    <el-pagination
+      @current-change="handleCurrentChange"
+      @size-change="handleSizeChange"
+      :current-page.sync="stolenTvInfoVo.current"
+      :page-size="stolenTvInfoVo.size"
+      layout="total, sizes, prev, pager, next, jumper"
+      :total="stolenTvInfoVo.total">
+    </el-pagination>
+  </div>
+  <el-dialog title="电视信息" :visible.sync="infoFormVisible" :close-on-click-modal="false">
+    <el-form :model="stolenTvInfo">
+      <el-form-item label="Model" :label-width="formLabelWidth">
+        <el-input v-model="stolenTvInfo.model" autocomplete="off"></el-input>
+      </el-form-item>
+      <el-form-item label="MAC" :label-width="formLabelWidth">
+        <el-input v-model="stolenTvInfo.mac" autocomplete="off"></el-input>
+      </el-form-item>
+      <el-form-item label="SN" :label-width="formLabelWidth">
+        <el-input v-model="stolenTvInfo.sn" autocomplete="off"></el-input>
+      </el-form-item>
+      <el-form-item label="Device ID" :label-width="formLabelWidth">
+        <el-input v-model="stolenTvInfo.deviceId" autocomplete="off"></el-input>
+      </el-form-item>
+    </el-form>
+    <div slot="footer" class="dialog-footer">
+      <el-button @click="infoFormVisible = false">取 消</el-button>
+      <el-button type="primary" @click="saveOrUpdate">保 存</el-button>
+    </div>
+  </el-dialog> 
+  <el-dialog
+    :visible.sync="uploadDialogVisible"
+    width="30%">
+      <el-upload
+        class="upload-demo"
+        drag
+        ref="upload"
+        action="http://10.16.113.27:8001/stolenTvInfo/importInfo"
+        style="margin-bottom: 20px"
+        :auto-upload="false"
+        :on-success="successUpload">
+        <i class="el-icon-upload"></i>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+      </el-upload>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="uploadDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="upload()">确 定</el-button>
+      </div>
+      </span>
+  </el-dialog>
+  <el-dialog title="错误信息" :visible.sync="errorMessageVisible" width="60%">
+  <el-table :data="errorMessage">
+    <el-table-column prop="model" label="Model" width="200"></el-table-column>
+    <el-table-column prop="mac" label="MAC" width="200"></el-table-column>
+    <el-table-column prop="sn" label="SN" width="200"></el-table-column>
+    <el-table-column prop="deviceId" label="Device ID" width="200"></el-table-column>
+    <el-table-column prop="message" label="错误信息" width="250"></el-table-column>
+  </el-table>
+  </el-dialog>
+</div>
+<script>
+var that = this
+var vm = new Vue({
+    el: '#app',
+    data() {
+        return {
+            stolenTvInfoVo: {
+                size : 10,
+                current: 1,
+                total: 0,
+                records: []
+            },
+            infoFormVisible: false,
+            stolenTvInfo: {
+                mac: '',
+                model: '',
+                sn: '',
+                deviceId: ''
+            },
+            formLabelWidth: '120px',
+            selection: [],
+            key: '',
+            searchType: 'mac',
+            uploadDialogVisible: false,
+            errorMessageVisible: false,
+            errorMessage: []
+        }
+    },
+    create() {
+        
+    },
+    mounted() {
+        this.getInfoData()
+    },
+    methods: {
+        getInfoData() {
+            that.post('/stolenTvInfo/list/', this.stolenTvInfoVo)
+            .then(res => {
+                console.log(res.data.data)
+                this.stolenTvInfoVo = res.data.data
+            })
+            
+        },
+        edit(obj) {
+            this.stolenTvInfo = obj
+            this.infoFormVisible = true
+        },
+        saveOrUpdate() {
+          if (this.stolenTvInfo.id != null) {
+            this.update()
+          } else {
+            this.save()
+          }
+        },
+        save() {
+          that.post('/stolenTvInfo/add/', this.stolenTvInfo)
+          .then(res => {
+            if (res.code === 200) {
+                this.infoFormVisible = false;
+                this.$message({
+                  message: '添加成功',
+                  type: 'success'
+                })
+                this.getInfoData()
+            } else {
+              this.$message.error(res.message);
+            }
+          })
+        },
+        update() {
+          that.post('/stolenTvInfo/update/', this.stolenTvInfo)
+            .then(res => {
+              if (res.code === 200) {
+                this.infoFormVisible = false;
+                this.$message({
+                  message: '修改成功',
+                  type: 'success'
+                })
+                this.getInfoData()
+              } else {
+                this.$message.error(res.message)
+              }
+            })
+        },
+        handleCurrentChange(current) {
+          this.stolenTvInfoVo.current = current
+          this.getInfoData()
+        },
+        handleSizeChange(size) {
+          this.stolenTvInfoVo.size = size
+          this.getInfoData()
+        },
+        clear() {
+          this.stolenTvInfo = {}
+        },
+        handleClickAdd() {
+          this.infoFormVisible = true;
+          this.clear()
+        },
+        handleClickDelete() {
+          if (this.selection.length < 1) return
+          this.$confirm('此操作将永久删除该数据, 是否继续?', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(() => {
+            this.deleteMore()
+          }).catch((error) => {
+            console.log(error)
+            this.$message({
+              type: 'info',
+              message: '已取消删除'
+            });          
+          });
+        },
+        handleSelectionChange(selection) {
+          this.selection = selection
+        },
+        remove(stolenTvInfo) {
+          this.$confirm('此操作将永久删除该数据, 是否继续?', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(() => {
+            this.deleteOne(stolenTvInfo)
+          }).catch(() => {
+            this.$message({
+              type: 'info',
+              message: '已取消删除'
+            });          
+          });
+        },
+        deleteOne(stolenTvInfo) {
+          that.get('/stolenTvInfo/delete/' + stolenTvInfo.id)
+          .then(res => {
+            if (res.code === 200) {
+              this.getInfoData()
+              this.$message({
+                type: 'success',
+                message: '删除成功'
+              }); 
+            } else {
+              this.$message.error(res.message)
+            }
+          })
+        },
+        deleteMore() {
+          if (this.selection.length < 1) return
+          var ids = '';
+          for (var i = 0; i < this.selection.length; i ++) {
+            if (i == this.selection.length - 1) {
+              ids = ids + this.selection[i].id
+            } else {
+              ids = ids + this.selection[i].id + ','
+            }
+          }
+          that.post('/stolenTvInfo/deleteMultiple/', ids)
+          .then(res => {
+            if (res.code === 200) {
+              this.$message({
+                type: 'success',
+                message: '删除成功'
+              }); 
+              this.getInfoData()
+            } else {
+              this.$message.error(res.message)
+            }
+          })
+        },
+        search() {
+          if (this.key == '') {
+            this.getInfoData()
+            return
+          }
+          this.stolenTvInfoVo[this.searchType] = this.key
+          this.getInfoData()
+        },
+        upload() {
+          this.$refs.upload.submit()
+        },
+        successUpload(response, file, fileList) {
+          if (response.code === 200) {
+            this.uploadDialogVisible = false;
+            this.$message({
+                type: 'success',
+                message: '导入成功'
+              });
+            this.getInfoData()
+          } else if (response.code === 250) {
+            this.openErrorMessage(response.data.errorMessage)
+            this.$message.error('部分数据错误')
+          } else {
+            this.$message.error('导入失败')
+          }
+        },
+        openErrorMessage(list) {
+          this.errorMessageVisible = true;
+          this.errorMessage = list
+        }
+    }
+})
+</script>
+</body>
+</html>
